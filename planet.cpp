@@ -45,6 +45,7 @@ int main(void) {
             glTranslatef(0, 5, 0);
             glScalef(0.6, 0.6, 1);
             drawCircle(0, 0.3, 1);
+            
             glPushMatrix();
             glRotatef(angleMoon, 0, 0, 1);
             glTranslatef(0, 3, 0);
