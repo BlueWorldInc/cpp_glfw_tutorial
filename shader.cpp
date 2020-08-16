@@ -1,29 +1,18 @@
 #include <app.h>
 
-// const GLchar* vertex120 = R"END(
-// #version 120
-// attribute vec4 inColor;
-// attribute vec4 inPosition;
-// uniform mat4 matrix;
-// varying vec4 outColor;
-
-// void main() {
-//     outColor = inColor;
-//     gl_Position= matrix * inPosition;
-// }
-
-// )END";
-
 const GLchar* vertex120 = R"END(
 #version 120
-attribute vec3 inPosition;
-attribute vec3 inColor;
-varying vec3 outColor;
-void main()
-{
+uniform mat4 matrix;
+attribute vec4 inColor;
+attribute vec4 inPosition;
+uniform mat4 matrix;
+varying vec4 outColor;
+
+void main() {
     outColor = inColor;
-    gl_Position = vec4(inPosition,1);
+    gl_Position= matrix * inPosition;
 }
+
 )END";
 
 const char* vertex150 = R"END(
@@ -39,23 +28,14 @@ void main() {
 
 )END";
 
-// const char* raster120 = R"END(
-// #version 120
-// varying vec4 outColor;
-
-// void main() {
-//     gl_FragColor = outColor;
-// }
-
-// )END";
-
-const GLchar* raster120 = R"END(
+const char* raster120 = R"END(
 #version 120
-varying vec3 outColor;
-void main()
-{
-    gl_FragColor = vec4(outColor,1);
+varying vec4 outColor;
+
+void main() {
+    gl_FragColor = outColor;
 }
+
 )END";
 
 const char* raster150 = R"END(
@@ -69,8 +49,6 @@ void main() {
 )END";
 
 int main(void) {
-
-    
 
     GLFWwindow *window;
 
@@ -95,15 +73,10 @@ int main(void) {
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
 
-    GLenum err = glewInit();
-    const char* source;
-
     // vertex shader
 
-    source = vertex120;
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    printf("hey\n");
-    glShaderSource(vertexShader, 1, &source, 0);
+    glShaderSource(vertexShader, 1, &vertex120, 0);
     glCompileShader(vertexShader);
     GLint compilationStatus;
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &compilationStatus);
@@ -115,13 +88,10 @@ int main(void) {
         exit(1);
     }
 
-    
     // fragment shader
 
-    source = raster120;
-
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &source, 0);
+    glShaderSource(fragmentShader, 1, &raster120, 0);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &compilationStatus);
 
@@ -134,7 +104,6 @@ int main(void) {
 
     // shader program
 
-    GLint linkStatus;
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
@@ -150,56 +119,6 @@ int main(void) {
 
     glUseProgram(shaderProgram);
 
-    // VBO setup
-
-    GLfloat positions[] = {
-        -1, -1, 0,
-        -1,  1, 0,
-         1, -1, 0,
-         1, -1, 0,
-        -1,  1, 0,
-         1,  1, 0
-    };
-    
-    GLfloat colors[] = {
-        1, 0, 0,
-        0, 1, 0,
-        0, 0, 1,
-        1, 1, 0,
-        1, 0, 1,
-        0, 1, 1
-    };
-
-
-
-
-    // send data to GPU
-
-    GLuint positionsData;
-    glGenBuffers(1, &positionsData);
-    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
-
-    GLuint colorsData;
-    glGenBuffers(1, &colorsData);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsData);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
-
-     // attributes
-    GLuint attribPosition;
-    GLuint attribColor;
-
-    attribPosition = glGetAttribLocation(shaderProgram, "inPosition");
-    glEnableVertexAttribArray(attribPosition);
-    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
-    glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    attribColor = glGetAttribLocation(shaderProgram, "inColor");
-    glEnableVertexAttribArray(attribColor);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsData);
-    glVertexAttribPointer(attribColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window)) {
 
@@ -207,7 +126,7 @@ int main(void) {
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        drawCircle(1, 1, 0);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -216,4 +135,32 @@ int main(void) {
 
     glfwTerminate();
     return 0;
+}
+
+void drawCircle(double red, double green, double blue) {
+    double radius = 1;
+    const double angle = 3.1415926 * 2 / steps;
+    double oldX = 0;
+    double oldY = 1;
+    for (int i = 0; i <= steps; i++) {
+        double newX = radius * sin(angle * i);
+        double newY = -radius * cos(angle * i);
+        glColor3f(red, green, blue);
+        glBegin(GL_TRIANGLES);
+        glVertex3f(0, 0, 0);
+        glVertex3f(oldX, oldY, 0);
+        glVertex3f(newX, newY, 0);
+        glEnd();
+        oldX = newX;
+        oldY = newY;
+    }
+}
+
+void drawPlanet(double angle, double distance, double diameter, double red, double green, double blue) {
+    glPushMatrix();
+    glRotatef(angle, 0, 0, 1);
+    glTranslatef(distance, 0, 0);
+    glScalef(diameter, diameter, 1);
+    drawCircle(red, green, blue);
+    glPopMatrix();
 }
