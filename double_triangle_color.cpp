@@ -1,43 +1,70 @@
 #include <app.h>
-#define GL_SILENCE_DEPRECATION 1
+
+// const GLchar* vertex120 = R"END(
+// #version 120
+// attribute vec4 inColor;
+// attribute vec4 inPosition;
+// uniform mat4 matrix;
+// varying vec4 outColor;
+
+// void main() {
+//     outColor = inColor;
+//     gl_Position= matrix * inPosition;
+// }
+
+// )END";
 
 const GLchar* vertex120 = R"END(
 #version 120
-attribute vec3 position;
-attribute vec3 color;
+attribute vec3 inPosition;
+attribute vec3 inColor;
 varying vec3 outColor;
-uniform float time;
-uniform mat4 matrix;
-uniform mat4 projection;
-void main() {
-    float theta = time;
-    
-    float co = cos(theta);
-    float si = sin(theta);
-    
-    mat4 rotationY = mat4(co, 0, si,  0,
-                          0,  1,  0,  0,
-                          -si,  0, co, 0,
-                          0,  0,  0,  1);
-
-    co = cos(theta/2.);
-    si = sin(theta/2.);
-
-    mat4 rotationX = mat4(1, 0, 0, 0,
-                          0, co, -si, 0,
-                          0, si, co, 0,
-                          0, 0, 0, 1);
-    outColor = color;
-    gl_Position = matrix * rotationY * rotationX * vec4(position, 1);
+void main()
+{
+    outColor = inColor;
+    gl_Position = vec4(inPosition,1);
 }
 )END";
+
+const char* vertex150 = R"END(
+#version 150
+in vec4 inColor;
+in vec4 inPosition;
+out vec4 outColor;
+
+void main() {
+    outColor = inColor;
+    gl_Position = inPosition;
+}
+
+)END";
+
+// const char* raster120 = R"END(
+// #version 120
+// varying vec4 outColor;
+
+// void main() {
+//     gl_FragColor = outColor;
+// }
+
+// )END";
 
 const GLchar* raster120 = R"END(
 #version 120
 varying vec3 outColor;
-uniform float time;
+void main()
+{
+    gl_FragColor = vec4(outColor,1);
+}
+)END";
+
+const char* raster150 = R"END(
+#version 150
+in vec4 outColor;
+out vec4 color;
+
 void main() {
-    gl_FragColor = vec4(outColor, 1);
+    color = outColor;
 }
 )END";
 
@@ -75,6 +102,7 @@ int main(void) {
 
     source = vertex120;
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    printf("hey\n");
     glShaderSource(vertexShader, 1, &source, 0);
     glCompileShader(vertexShader);
     GLint compilationStatus;
@@ -124,87 +152,50 @@ int main(void) {
 
     // VBO setup
 
-    GLfloat vertices[] = {
-        -1, -1, +1,
-        -1, +1, +1,
-        +1, +1, +1,
-        +1, -1, +1,
-        -1, -1, -1,
-        -1, +1, -1,
-        +1, +1, -1,
-        +1, -1, -1,
+    GLfloat positions[] = {
+        -1, -1, 0,
+        -1,  1, 0,
+         1, -1, 0,
+         1, -1, 0,
+        -1,  1, 0,
+         1,  1, 0
     };
-
+    
     GLfloat colors[] = {
         1, 0, 0,
         0, 1, 0,
         0, 0, 1,
-        1, 0, 1,
         1, 1, 0,
-        0, 1, 1,
-        0, 1, 0,
-        1, 0, 0,
+        1, 0, 1,
+        0, 1, 1
     };
 
-    GLubyte indices[] = {
-        0, 1, 2,
-        0, 2, 3,
-        0, 4, 5,
-        0, 5, 1,
-        1, 5, 6,
-        1, 6, 2,
-        3, 2, 6,
-        3, 6, 7,
-        4, 0, 7,
-        7, 0, 3,
-        7, 6, 5,
-        7, 5, 4,
-    };
+    // send data to GPU
 
-    GLuint verticesBuf;
-    glGenBuffers(1, &verticesBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, verticesBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    GLuint positionsData;
+    glGenBuffers(1, &positionsData);
+    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
 
-    GLuint colorsBuf;
-    glGenBuffers(1, &colorsBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsBuf);
+    GLuint colorsData;
+    glGenBuffers(1, &colorsData);
+    glBindBuffer(GL_ARRAY_BUFFER, colorsData);
     glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
-
-    GLuint indicesBuf;
-    glGenBuffers(1, &indicesBuf);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesBuf);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
 
      // attributes
     GLuint attribPosition;
-    attribPosition = glGetAttribLocation(shaderProgram, "position");
+    GLuint attribColor;
+
+    attribPosition = glGetAttribLocation(shaderProgram, "inPosition");
     glEnableVertexAttribArray(attribPosition);
-    glBindBuffer(GL_ARRAY_BUFFER, verticesBuf);
+    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
     glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    GLuint attribColor;
-    attribColor = glGetAttribLocation(shaderProgram, "color");
+    attribColor = glGetAttribLocation(shaderProgram, "inColor");
     glEnableVertexAttribArray(attribColor);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsBuf);
+    glBindBuffer(GL_ARRAY_BUFFER, colorsData);
     glVertexAttribPointer(attribColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    
-    GLfloat matrix[] = {
-        0.5, 0,   0,   0,
-        0,   0.5, 0,   0,
-        0,   0,   0.5, 0,
-        0,   0,   0,   1
-    };
-    
-    GLuint attribMatrix;
-    attribMatrix = glGetUniformLocation(shaderProgram, "matrix");
-    glUniformMatrix4fv(attribMatrix, 1, GL_FALSE, matrix);
 
-    GLuint uniformTime;
-    uniformTime = glGetUniformLocation(shaderProgram, "time");
-
-    glEnable(GL_CULL_FACE); 
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window)) {
@@ -213,10 +204,7 @@ int main(void) {
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        float time = glfwGetTime();
-        glUniform1f(uniformTime, time);
-
-        glDrawElements(GL_TRIANGLES, sizeof(indices), GL_UNSIGNED_BYTE, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

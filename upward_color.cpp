@@ -3,41 +3,22 @@
 
 const GLchar* vertex120 = R"END(
 #version 120
-attribute vec3 position;
-attribute vec3 color;
-varying vec3 outColor;
-uniform float time;
-uniform mat4 matrix;
-uniform mat4 projection;
+attribute vec3 inPosition;
 void main() {
-    float theta = time;
-    
-    float co = cos(theta);
-    float si = sin(theta);
-    
-    mat4 rotationY = mat4(co, 0, si,  0,
-                          0,  1,  0,  0,
-                          -si,  0, co, 0,
-                          0,  0,  0,  1);
-
-    co = cos(theta/2.);
-    si = sin(theta/2.);
-
-    mat4 rotationX = mat4(1, 0, 0, 0,
-                          0, co, -si, 0,
-                          0, si, co, 0,
-                          0, 0, 0, 1);
-    outColor = color;
-    gl_Position = matrix * rotationY * rotationX * vec4(position, 1);
+    gl_Position = vec4(inPosition, 1);
 }
 )END";
 
 const GLchar* raster120 = R"END(
 #version 120
-varying vec3 outColor;
+uniform vec2 res;
 uniform float time;
 void main() {
-    gl_FragColor = vec4(outColor, 1);
+        float i = 1.f - (gl_FragCoord.y / res.y)/2.f;
+    gl_FragColor = vec4(i*abs(sin(i*time)),  // 0 - 1
+                        abs(sin(i*time*3.f)),
+                        i*abs(sin(time/2.f)),
+                        1.f);
 }
 )END";
 
@@ -124,87 +105,36 @@ int main(void) {
 
     // VBO setup
 
-    GLfloat vertices[] = {
-        -1, -1, +1,
-        -1, +1, +1,
-        +1, +1, +1,
-        +1, -1, +1,
-        -1, -1, -1,
-        -1, +1, -1,
-        +1, +1, -1,
-        +1, -1, -1,
+    GLfloat positions[] = {
+        -1, -1, 0,
+        -1,  1, 0,
+         1, -1, 0,
+         1, -1, 0,
+        -1,  1, 0,
+         1,  1, 0
     };
 
-    GLfloat colors[] = {
-        1, 0, 0,
-        0, 1, 0,
-        0, 0, 1,
-        1, 0, 1,
-        1, 1, 0,
-        0, 1, 1,
-        0, 1, 0,
-        1, 0, 0,
-    };
+    // send data to GPU
 
-    GLubyte indices[] = {
-        0, 1, 2,
-        0, 2, 3,
-        0, 4, 5,
-        0, 5, 1,
-        1, 5, 6,
-        1, 6, 2,
-        3, 2, 6,
-        3, 6, 7,
-        4, 0, 7,
-        7, 0, 3,
-        7, 6, 5,
-        7, 5, 4,
-    };
-
-    GLuint verticesBuf;
-    glGenBuffers(1, &verticesBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, verticesBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    GLuint colorsBuf;
-    glGenBuffers(1, &colorsBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
-
-    GLuint indicesBuf;
-    glGenBuffers(1, &indicesBuf);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesBuf);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
+    GLuint positionsData;
+    glGenBuffers(1, &positionsData);
+    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
 
      // attributes
     GLuint attribPosition;
-    attribPosition = glGetAttribLocation(shaderProgram, "position");
+
+    attribPosition = glGetAttribLocation(shaderProgram, "inPosition");
     glEnableVertexAttribArray(attribPosition);
-    glBindBuffer(GL_ARRAY_BUFFER, verticesBuf);
+    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
     glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    GLuint attribColor;
-    attribColor = glGetAttribLocation(shaderProgram, "color");
-    glEnableVertexAttribArray(attribColor);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsBuf);
-    glVertexAttribPointer(attribColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    
-    GLfloat matrix[] = {
-        0.5, 0,   0,   0,
-        0,   0.5, 0,   0,
-        0,   0,   0.5, 0,
-        0,   0,   0,   1
-    };
-    
-    GLuint attribMatrix;
-    attribMatrix = glGetUniformLocation(shaderProgram, "matrix");
-    glUniformMatrix4fv(attribMatrix, 1, GL_FALSE, matrix);
+    GLuint uniformRes;
+    uniformRes = glGetUniformLocation(shaderProgram, "res");
+    glUniform2f(uniformRes, 600.f, 600.f);
 
     GLuint uniformTime;
     uniformTime = glGetUniformLocation(shaderProgram, "time");
-
-    glEnable(GL_CULL_FACE); 
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window)) {
@@ -216,7 +146,7 @@ int main(void) {
         float time = glfwGetTime();
         glUniform1f(uniformTime, time);
 
-        glDrawElements(GL_TRIANGLES, sizeof(indices), GL_UNSIGNED_BYTE, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -3,41 +3,24 @@
 
 const GLchar* vertex120 = R"END(
 #version 120
-attribute vec3 position;
-attribute vec3 color;
-varying vec3 outColor;
-uniform float time;
+attribute vec3 inPosition;
+attribute vec2 inUvs;
+varying vec2 outUvs;
 uniform mat4 matrix;
-uniform mat4 projection;
 void main() {
-    float theta = time;
-    
-    float co = cos(theta);
-    float si = sin(theta);
-    
-    mat4 rotationY = mat4(co, 0, si,  0,
-                          0,  1,  0,  0,
-                          -si,  0, co, 0,
-                          0,  0,  0,  1);
-
-    co = cos(theta/2.);
-    si = sin(theta/2.);
-
-    mat4 rotationX = mat4(1, 0, 0, 0,
-                          0, co, -si, 0,
-                          0, si, co, 0,
-                          0, 0, 0, 1);
-    outColor = color;
-    gl_Position = matrix * rotationY * rotationX * vec4(position, 1);
+    outUvs = inUvs;
+    gl_Position = matrix * vec4(inPosition, 1);
 }
 )END";
 
 const GLchar* raster120 = R"END(
 #version 120
-varying vec3 outColor;
+uniform vec2 res;
 uniform float time;
+varying vec2 outUvs;
+uniform sampler2D tex;
 void main() {
-    gl_FragColor = vec4(outColor, 1);
+    gl_FragColor = texture2D(tex, outUvs);
 }
 )END";
 
@@ -124,87 +107,108 @@ int main(void) {
 
     // VBO setup
 
-    GLfloat vertices[] = {
-        -1, -1, +1,
-        -1, +1, +1,
-        +1, +1, +1,
-        +1, -1, +1,
-        -1, -1, -1,
-        -1, +1, -1,
-        +1, +1, -1,
-        +1, -1, -1,
+    GLfloat positions[] = {
+        -1, -1, 0,
+        -1,  1, 0,
+         1, -1, 0,
+         1, -1, 0,
+        -1,  1, 0,
+         1,  1, 0
     };
 
-    GLfloat colors[] = {
-        1, 0, 0,
-        0, 1, 0,
-        0, 0, 1,
-        1, 0, 1,
-        1, 1, 0,
-        0, 1, 1,
-        0, 1, 0,
-        1, 0, 0,
+    GLuint positionsData;
+    glGenBuffers(1, &positionsData);
+    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+
+    GLfloat uvs[] = {
+        0, 0,
+        0, 1,
+        1, 0,
+        1, 0,
+        0, 1,
+        1, 1
+    };
+    
+    GLuint uvsData;
+    glGenBuffers(1, &uvsData);
+    glBindBuffer(GL_ARRAY_BUFFER, uvsData);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(uvs), uvs, GL_STATIC_DRAW);
+
+    // texture
+
+    #pragma pack(push)
+    #pragma pack(1)
+
+    struct Pixel {
+        GLubyte r;
+        GLubyte g;
+        GLubyte b;
     };
 
-    GLubyte indices[] = {
-        0, 1, 2,
-        0, 2, 3,
-        0, 4, 5,
-        0, 5, 1,
-        1, 5, 6,
-        1, 6, 2,
-        3, 2, 6,
-        3, 6, 7,
-        4, 0, 7,
-        7, 0, 3,
-        7, 6, 5,
-        7, 5, 4,
+    Pixel O = {0x00, 0xFF, 0x00};
+    Pixel X = {0xFF, 0xFF, 0x00};
+    Pixel o = {0x11, 0x11, 0x11};
+    Pixel x = {0x33, 0x33, 0x11};
+
+    Pixel texture[] = {
+        o, o, o, o, o,
+        o, O, o, O, o,
+        o, o, o, o, o,
+        X, x, o, x, X,
+        x, X, X, X, x,
     };
 
-    GLuint verticesBuf;
-    glGenBuffers(1, &verticesBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, verticesBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    #pragma pack(pop)
 
-    GLuint colorsBuf;
-    glGenBuffers(1, &colorsBuf);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsBuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+    GLuint texid;
+    glGenTextures(1, &texid);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texid);
 
-    GLuint indicesBuf;
-    glGenBuffers(1, &indicesBuf);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesBuf);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 5, 5, 0, GL_RGB, GL_UNSIGNED_BYTE, (void*) texture);
+
+    GLuint attribTex = glGetAttribLocation(shaderProgram, "tex");
+    glUniform1i(attribTex, 0);
+
+
 
 
      // attributes
-    GLuint attribPosition;
-    attribPosition = glGetAttribLocation(shaderProgram, "position");
-    glEnableVertexAttribArray(attribPosition);
-    glBindBuffer(GL_ARRAY_BUFFER, verticesBuf);
-    glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    GLuint attribColor;
-    attribColor = glGetAttribLocation(shaderProgram, "color");
-    glEnableVertexAttribArray(attribColor);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsBuf);
-    glVertexAttribPointer(attribColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    
-    GLfloat matrix[] = {
-        0.5, 0,   0,   0,
-        0,   0.5, 0,   0,
-        0,   0,   0.5, 0,
-        0,   0,   0,   1
+     GLfloat matrix[] = {
+        -1, 0, 0, 0,
+        0, -1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
     };
-    
+
     GLuint attribMatrix;
     attribMatrix = glGetUniformLocation(shaderProgram, "matrix");
     glUniformMatrix4fv(attribMatrix, 1, GL_FALSE, matrix);
 
+    GLuint attribPosition;
+    attribPosition = glGetAttribLocation(shaderProgram, "inPosition");
+    glEnableVertexAttribArray(attribPosition);
+    glBindBuffer(GL_ARRAY_BUFFER, positionsData);
+    glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    GLuint attribUvs;
+    attribUvs = glGetAttribLocation(shaderProgram, "inUvs");
+    glEnableVertexAttribArray(attribUvs);
+    glBindBuffer(GL_ARRAY_BUFFER, uvsData);
+    glVertexAttribPointer(attribUvs, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    
+
+    GLuint uniformRes;
+    uniformRes = glGetUniformLocation(shaderProgram, "res");
+    glUniform2f(uniformRes, 600.f, 600.f);
+
     GLuint uniformTime;
     uniformTime = glGetUniformLocation(shaderProgram, "time");
-
-    glEnable(GL_CULL_FACE); 
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window)) {
@@ -216,7 +220,7 @@ int main(void) {
         float time = glfwGetTime();
         glUniform1f(uniformTime, time);
 
-        glDrawElements(GL_TRIANGLES, sizeof(indices), GL_UNSIGNED_BYTE, 0);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
